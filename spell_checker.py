@@ -44,88 +44,113 @@ class SpellChecker:
         f = open( KEY_ADJACENCY_FILE )
         self.adjacent = dict()
         for line in f:
-            letter = line[ 0 ]
-            others = line[ 1: ].split()
-            self.adjacent[ letter ] = others
+            letters = line.split()
+            self.adjacent[ letters[ 0 ] ] = letters[ 1: ]
 
         f.close()
 
-    def check_adjacent( self, word ):
+    def check_adjacent( self, u_word ):
         """
         Replaces each letter in word with an adjacent letter
         and checks in the new word is in the english dictionary
         """
-        for i in range( len( word.get_unchecked() ) ):
-            char = word.get_unchecked()[ i ]
+        for i in range( len( u_word.get_unchecked() ) ):
+            char = u_word.get_unchecked()[ i ]
             if char not in self.adjacent.keys():
                 return False
 
-            for adj in range( len( self.adjacent[ char ] ) ):
-                copy = word.get_unchecked()
+            for adj in self.adjacent[ char ]:
+                copy = u_word.get_unchecked()
                 copy = copy[ 0: i ] + adj + copy[ i + 1: ]
                 if copy in self.english:
-                    word.corrected = copy
+                    u_word.set_corrected( copy )
                     return True
 
         return False
 
-    def check_extra( self, word ):
+    def check_extra( self, u_word ):
         """
         Checks if there is an extra unnecessary character in the word
         """
-        for i in range( len( word.get_unchecked() ) ):
-            new_word = word.get_unchecked()[ 0: i ] + word.get_unchecked()[ i + 1: ]
+        for i in range( len( u_word.get_unchecked() ) ):
+            new_word = u_word.get_unchecked()[ 0: i ] + u_word.get_unchecked()[ i + 1: ]
             if new_word in self.english:
-                word.corrected = new_word
+                u_word.set_corrected( new_word )
                 return True
 
         return False
 
-    def check_missing( self, word ):
+    def check_missing( self, u_word ):
         """
         Checks if there is a missing character in the word
         """
-        for index in range( len( word.get_unchecked ) + 1 ):
-            part1 = word.get_unchecked()[ :index ]
-            part2 = word.get_unchecked()[ index: ]
+        for index in range( len( u_word.get_unchecked() ) + 1 ):
+            part1 = u_word.get_unchecked()[ :index ]
+            part2 = u_word.get_unchecked()[ index: ]
             for value in range( ord( "a" ), ord( "z" ) + 1 ):
                 new_word = part1 + chr( value ) + part2
                 if new_word in self.english:
-                    word.corrected = new_word
+                    u_word.set_corrected( new_word )
                     return True
 
         return False
     
-    def run_checks( self, word ):
+    def run_checks( self, u_word ):
         """
         First checks if a word is a number,
         Then checks if the lowercase version is in the dictionary,
         Then runs check_adjacent, check_extra, and check_missing.
 
         If all checks fail, then the unknown word is printed.
+
+        :param u_word: Unchecked word
         """
-        word.remove_punc()
-        if word.is_number():
-            self.checked_words += word.orig
-        elif word.get_unchecked().lower() in self.english:
-            self.checked_words += word.orig
+        u_word.preprocess()
+
+        if u_word.is_number():
+            self.checked_words += u_word.orig
+        elif u_word.get_unchecked().lower() in self.english:
+            self.checked_words += u_word.orig
         # Each check can take a while, so writing extra
         # elif statements saves time
-        elif self.check_adjacent( word ):
-            self.checked_words += word.get_corrected()
-        elif self.check_extra( word ):
-            self.checked_words += word.get_corrected()
-        elif self.check_missing( word ):
-            self.checked_words += word.get_corrected()
+        elif self.check_missing( u_word ):
+            self.checked_words += u_word.get_corrected()
+        elif self.check_adjacent( u_word ):
+            self.checked_words += u_word.get_corrected()
+        elif self.check_extra( u_word ):
+            self.checked_words += u_word.get_corrected()
         else:
-            self.unknown.append( word.orig )
+            self.unknown.append( u_word.orig )
+            self.checked_words += u_word.orig
+
+        self.checked_words += " "
 
     def run( self ):
+        """
+        Reads from the input file and starts spell checking.
+        """
+        self.get_adjacent()
+        self.get_dictionary()
+
         file = input( "Enter text file here: " )
         text = open( file )
 
         for line in text:
-            words = line.split()
+            strings = line.split()
+            for s in strings:
+                u_word = Word( s )
+                self.run_checks( u_word )
 
+            self.checked_words += "\n"
 
         text.close()
+
+        new_file = open( "checked_words.txt", "w+" )
+        new_file.write( self.checked_words )
+        new_file.close()
+        print( "Unknown words:", self.unknown )
+
+
+if __name__ == "__main__":
+    spell_checker = SpellChecker()
+    spell_checker.run()
